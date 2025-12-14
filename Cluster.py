@@ -7,21 +7,29 @@ import os
 IMAGE_FOLDER = "calibration_images/*.png"
 BLOCK_SPACING_MM = 40.0 
 
-# GRID
+# GRID (Landscape 4x3)
 GRID_ROWS = 3
 GRID_COLS = 4
-EXPECTED_POINTS = 12
+EXPECTED_POINTS = 12                                                                                                     
 
-# Global variables for mouse callback
+# Global variables
 clicks = []
 current_img = None
 display_img = None
 
 def get_obj_points():
-    objp = np.zeros((EXPECTED_POINTS, 3), np.float32)
-    mgrid = np.mgrid[0:GRID_ROWS, 0:GRID_COLS].T.reshape(-1, 2)
-    objp[:, :2] = mgrid[:, ::-1] * BLOCK_SPACING_MM
-    return objp
+    """
+    FIXED GENERATION:
+    Creates points strictly Left-to-Right, Top-to-Bottom.
+    (0,0), (40,0), (80,0), (120,0) -> Row 0
+    (0,40), (40,40)...             -> Row 1
+    """
+    objp = []
+    for r in range(GRID_ROWS):          # Iterate Rows (0, 1, 2)
+        for c in range(GRID_COLS):      # Iterate Cols (0, 1, 2, 3)
+            # X = Col * Spacing, Y = Row * Spacing, Z = 0
+            objp.append([c * BLOCK_SPACING_MM, r * BLOCK_SPACING_MM, 0])
+    return np.array(objp, dtype=np.float32)
 
 def mouse_callback(event, x, y, flags, param):
     global clicks, current_img, display_img
@@ -29,11 +37,12 @@ def mouse_callback(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         if len(clicks) < EXPECTED_POINTS:
             clicks.append((x, y))
-            # Draw visual feedback
+            # Visual Feedback
             cv2.circle(display_img, (x, y), 5, (0, 0, 255), -1)
+            # Draw number to confirm order
             cv2.putText(display_img, str(len(clicks)-1), (x+5, y-5), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            cv2.imshow("Manual Calibration", display_img)
+            cv2.imshow("Manual Calibration V3", display_img)
 
 def main():
     global clicks, current_img, display_img
@@ -43,11 +52,13 @@ def main():
         print("No images found.")
         return
 
-    print("--- MANUAL CALIBRATION TOOL V2 (FIXED) ---")
-    print(" 1. Click 12 centers (0=Top-Left -> 11=Bot-Right).")
-    print(" 2. Press [Space] to save and go to next image.")
-    print(" 3. Press [d] to Skip/Discard image.")
-    print(" 4. Press [q] to FINISH and Calculate.")
+    print("--- MANUAL CALIBRATION V3 (FIXED MAP) ---")
+    print(" 1. Click Row 1 (Left->Right)")
+    print(" 2. Click Row 2 (Left->Right)")
+    print(" 3. Click Row 3 (Left->Right)")
+    print(" 4. Press [Space] to Save.")
+    print(" 5. Press [d] to Skip.")
+    print(" 6. Press [q] to Finish.")
 
     obj_points_list = []
     img_points_list = []
@@ -56,8 +67,8 @@ def main():
     valid_count = 0
     stop_program = False
 
-    cv2.namedWindow("Manual Calibration")
-    cv2.setMouseCallback("Manual Calibration", mouse_callback)
+    cv2.namedWindow("Manual Calibration V3")
+    cv2.setMouseCallback("Manual Calibration V3", mouse_callback)
 
     for fname in images:
         if stop_program: break
@@ -69,12 +80,12 @@ def main():
         display_img = current_img.copy()
         cv2.putText(display_img, f"Img {valid_count+1}: Click 12 points", (10, 30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.imshow("Manual Calibration", display_img)
+        cv2.imshow("Manual Calibration V3", display_img)
         
         while True:
             key = cv2.waitKey(1)
             
-            # [Space] = Save & Next
+            # [Space] Save
             if key == ord(' '):
                 if len(clicks) == EXPECTED_POINTS:
                     print(f"[SAVED] {fname}")
@@ -83,9 +94,9 @@ def main():
                     valid_count += 1
                     break
                 else:
-                    print(f"Need 12 points! You have {len(clicks)}.")
+                    print(f"Need 12 points! (Have {len(clicks)})")
             
-            # [z] = Undo
+            # [z] Undo
             elif key == ord('z'):
                 if len(clicks) > 0:
                     clicks.pop()
@@ -96,26 +107,26 @@ def main():
                         cv2.circle(display_img, pt, 5, (0, 0, 255), -1)
                         cv2.putText(display_img, str(i), (pt[0]+5, pt[1]-5), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    cv2.imshow("Manual Calibration", display_img)
+                    cv2.imshow("Manual Calibration V3", display_img)
 
-            # [d] = Discard (Skip image)
+            # [d] Discard
             elif key == ord('d'):
                 print(f"[SKIPPED] {fname}")
                 break
                 
-            # [q] = Quit and Calculate
+            # [q] Calculate
             elif key == ord('q'):
-                print("Finishing up...")
+                print("Calculating...")
                 stop_program = True
                 break
 
     cv2.destroyAllWindows()
 
     if valid_count < 5:
-        print(f"Not enough images annotated ({valid_count}). Need at least 5.")
+        print(f"Not enough images ({valid_count}). Need 5+.")
         return
 
-    print(f"\n--- Running Math on {valid_count} Manual Images ---")
+    print(f"\n--- Running Math on {valid_count} Images ---")
     gray_shape = current_img.shape[:2][::-1] 
     
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(

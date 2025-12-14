@@ -5,7 +5,7 @@ from orbbec_camera import OrbbecCamera
 def main():
     # --- CONFIGURATION ---
     # We now know False gives us the clear geometric view
-    SHOW_IR_MODE = False 
+    SHOW_IR_MODE = True 
     
     try:
         # Initialize Camera
